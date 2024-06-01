@@ -1,8 +1,10 @@
+import { Cell } from "./classes/Cell.js"
+
 /** @type {HTMLCanvasElement} */
 const canvas = document.getElementById("canvas")
 /** @type {CanvasRenderingContext2D} */
 const ctx = canvas.getContext("2d")
-const gridHasLines = true
+const gridHasLines = false
 
 // Set canvas dimensions to match the window size
 function setCanvastoParentSize() {
@@ -169,19 +171,17 @@ function handleFPS(timestamp) {
 }
 
 const drawAll = () => {
-  //ungridded -mostlikely useless to me
-  drawRect(190, 190, 70, 70, "aqua")
-  drawCircle(200, 200, 50, 0, Math.PI * 2, "red")
-  drawText("Hello World", 620, 250, "100%", "Arial", "red")
-
   drawGrid(gridArray)
 }
 const reset = () => {
   drawRect(0, 0, canvas.width, canvas.height, "#000")
 }
+
+const myCell = new Cell(2, 2, 50, true, getGridItem)
+
 const update = () => {
   drawAll()
-
+  myCell.simulate()
   //draw fps
   if (fps) drawText(fps.toFixed(0), 10, 20, "100%", "Arial", "#FFF")
 
@@ -190,35 +190,5 @@ const update = () => {
   requestAnimationFrame(handleFPS)
   requestAnimationFrame(update)
 }
+
 update()
-
-//#region  test images
-const imageGridItem = getGridItem(4, 4)
-// Gen random delay
-const delay = Math.floor(Math.random() * 11) + 3
-
-const loadImage = async () => {
-  await loadRandomImage(imageGridItem)
-
-  setTimeout(() => {
-    loadImage()
-  }, delay * 1000) // ms to s
-}
-loadImage()
-
-//#endregion
-//#region test Rect
-const rectGridItem = getGridItem(0, 3)
-rectGridItem.content = "#123"
-rectGridItem.contentType = "rect"
-//#endregion
-//#region test Circle
-const circleGridItem = getGridItem(1, 3)
-circleGridItem.content = "#123"
-circleGridItem.contentType = "circle"
-//#endregion
-//#region test Text
-const textGridItem = getGridItem(1, 2)
-textGridItem.content = "Hello My Cutie Grid"
-textGridItem.contentType = "text"
-//#endregion
