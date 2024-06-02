@@ -1,4 +1,4 @@
-import { Cell } from "./classes/Cell.js"
+import { Cell, CellManagerInstance } from "./classes/Cell.js"
 
 /** @type {HTMLCanvasElement} */
 const canvas = document.getElementById("canvas")
@@ -160,7 +160,7 @@ function getGridItem(atRow, atCol) {
 }
 
 //usage example:
-const gridArray = createGrid(5, 5, "lightgray")
+const gridArray = createGrid(50, 50, "lightgray")
 
 let fps, lastTimestamp
 function handleFPS(timestamp) {
@@ -177,18 +177,32 @@ const reset = () => {
   drawRect(0, 0, canvas.width, canvas.height, "#000")
 }
 
-const myCell = new Cell(2, 2, 50, true, getGridItem)
-
+const cellManager = CellManagerInstance
+const myCell = new Cell(5, 5, 100, true, getGridItem)
+cellManager.addCell(myCell)
+let pause = false
 const update = () => {
   drawAll()
-  myCell.simulate()
+  if (!pause) cellManager.simulate()
   //draw fps
   if (fps) drawText(fps.toFixed(0), 10, 20, "100%", "Arial", "#FFF")
 
+  // implement like deltaTime
+  // found a good article:
+  // https://stephendoddtech.com/blog/game-design/variable-delta-time-javascript-game-loop
   const timestamp = performance.now()
   requestAnimationFrame(reset)
   requestAnimationFrame(handleFPS)
   requestAnimationFrame(update)
 }
-
+window.addEventListener("keydown", ev => {
+  if (ev.key === " ") {
+    const togglePause = () => {
+      pause = !pause
+      if (!pause) cellManager.pause()
+      else cellManager.start()
+    }
+    togglePause()
+  }
+})
 update()
