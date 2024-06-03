@@ -162,7 +162,9 @@ function getGridItem(atRow, atCol) {
 //usage example:
 const gridArray = createGrid(50, 50, "lightgray")
 
-let fps, lastTimestamp
+let fps = 0,
+  shouldDrawFps = true,
+  lastTimestamp
 function handleFPS(timestamp) {
   const deltaTime = timestamp - lastTimestamp
   lastTimestamp = timestamp
@@ -181,20 +183,7 @@ const cellManager = CellManagerInstance
 const myCell = new Cell(5, 5, 100, true, getGridItem)
 cellManager.addCell(myCell)
 let pause = false
-const update = () => {
-  drawAll()
-  if (!pause) cellManager.simulate()
-  //draw fps
-  if (fps) drawText(fps.toFixed(0), 10, 20, "100%", "Arial", "#FFF")
 
-  // implement like deltaTime
-  // found a good article:
-  // https://stephendoddtech.com/blog/game-design/variable-delta-time-javascript-game-loop
-  const timestamp = performance.now()
-  requestAnimationFrame(reset)
-  requestAnimationFrame(handleFPS)
-  requestAnimationFrame(update)
-}
 window.addEventListener("keydown", ev => {
   if (ev.key === " ") {
     const togglePause = () => {
@@ -205,4 +194,30 @@ window.addEventListener("keydown", ev => {
     togglePause()
   }
 })
+
+let timeLastUpdate
+const maxDeltaTime = 1 / 165 // since i have 165
+
+const update = () => {
+  const currentTime = performance.now()
+  const deltaTimeMillis = currentTime - timeLastUpdate
+  const deltaTimeSecs = deltaTimeMillis / 1000.0
+  timeLastUpdate = currentTime
+
+  if (!pause && deltaTimeSecs > maxDeltaTime) {
+    cellManager.simulate(deltaTimeSecs)
+  }
+
+  drawAll()
+
+  if (shouldDrawFps) drawText(fps.toFixed(0), 10, 20, "100%", "Arial", "#FFF")
+  requestAnimationFrame(reset)
+  requestAnimationFrame(update)
+  requestAnimationFrame(handleFPS)
+}
+
+// init timeLastUpdate on sim start
+const now = performance.now()
+timeLastUpdate = now
+
 update()
