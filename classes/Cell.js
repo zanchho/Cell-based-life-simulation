@@ -1,3 +1,5 @@
+import { PerformanceChecker } from "../PerfChecker.js"
+const checkHere = new PerformanceChecker()
 export class Cell {
   constructor(row, col, energy = 100, alive = true, FnGetGridItem) {
     this.row = row
@@ -8,11 +10,15 @@ export class Cell {
     this.seeds = []
     this.FnGetGridItem = FnGetGridItem
     this.FnIsGridItemEmpty = (row, col) => {
-      try {
-        return this.FnGetGridItem(row, col).contentType === undefined
-      } catch {
+      let res = this.FnGetGridItem(row, col)
+      if (!res) {
+        console.log("FnIsGridItemEmpty early return")
         return false
       }
+      if (!res.hasOwnProperty("contentType") || res.contentType === undefined) {
+        return true
+      }
+      return false
     }
     this.FnClearGridItem = () => {
       const gI = this.FnGetGridItem(this.row, this.col)
@@ -35,12 +41,16 @@ export class Cell {
   }
 
   canMove(direction) {
-    const row = this.row + direction[0]
-    const col = this.col + direction[1]
-    return this.FnIsGridItemEmpty(row, col)
+    return this.FnIsGridItemEmpty(
+      this.row + direction[0],
+      this.col + direction[1]
+    )
   }
   move(direction) {
-    if (!this.canMove(direction)) return
+    if (!this.canMove(direction)) {
+      //tried to move but cant so it looses energy
+      return
+    }
 
     //if it can move to the location its gonna clear up the GridItem
     this.FnClearGridItem()
@@ -68,9 +78,7 @@ export class Cell {
   }
   //energy gain
   photosynthesise() {
-    // console.log("cell photosynthesise ")
-    let energyGain = 5
-
+    let energyGain = 10
     if (this.FnIsGridItemEmpty(this.row, this.col + 1)) energyGain += 5
     if (this.FnIsGridItemEmpty(this.row + 1, this.col)) energyGain += 5
     if (this.FnIsGridItemEmpty(this.row - 1, this.col)) energyGain += 5
@@ -87,12 +95,12 @@ export class Cell {
       [1, -1],
       [-1, -1],
     ])
-    // console.log("cell reproduce")
-    //effort to put into seed
+
+    //effort to put into seed might need adjustments
     const pos = [this.row + direction[0], this.col + direction[1]]
     if (this.FnIsGridItemEmpty(pos[0], pos[1])) {
       const passEnergyToSeed = 50
-      this.seeds.push(new Seed(pos[0], pos[1], passEnergyToSeed, [1, 1], this))
+      this.seeds.push(new Seed(pos[0], pos[1], passEnergyToSeed, this))
       this.energy -= passEnergyToSeed
     }
   }
@@ -133,7 +141,11 @@ export class Cell {
       return
     }
 
-    if (this.energy > 70 && this.seeds.length < 1) {
+    if (
+      !cM_instance.isMaxCellsReached() &&
+      this.energy > 70 &&
+      this.seeds.length < 1
+    ) {
       this.reproduce()
       return
     }
@@ -147,12 +159,11 @@ export class Cell {
 
 //issue seeds aint getting simulated .-.
 class Seed {
-  constructor(row, col, energy, direction, origin) {
-    this.row = row + direction[0]
-    this.col = col + direction[1]
+  constructor(row, col, energy, origin) {
+    this.row = row
+    this.col = col
     this.energy = energy
     this.color = "yellow"
-    this.direction = direction
     this.origin = origin
 
     this.growingState = 0
@@ -193,16 +204,20 @@ class Seed {
               this.origin.FnGetGridItem
             )
           )
+
           return
         }
         this.FnMakeDrawAble()
         this.growingState++
       } else {
         // console.log("seed dyes")
-        this.origin.seeds = this.origin.seeds.filter(seed => seed !== this)
         this.FnClearGridItem()
-        delete this
+        this.killSeed()
       }
+    }
+    this.killSeed = () => {
+      this.origin.seeds = this.origin.seeds.filter(seed => seed !== this)
+      delete this
     }
   }
 }
@@ -217,15 +232,14 @@ each one more approachable
 class CellManager {
   //first implementing of existing only one type across the simulation
   constructor() {
-    this.maxCells = 1500
+    this.maxCells = 1500 //limiting for performance tho
     // initialCellArray[0] = {row, col, energy = 100, alive = true, FnGetGridItem}
-    this.paused = false // 0playi
+    this.paused = false
     this.cellArray = []
 
     this.addCell = cell => {
       if (!cell instanceof Cell) return false
-      if (this.cellArray.length >= this.maxCells) {
-        console.log(`Existing Cells: ${this.cellArray.length} cant add more`)
+      if (this.isMaxCellsReached()) {
         //kill cell
         cell.energy = -100
         return false
@@ -236,16 +250,14 @@ class CellManager {
     }
     this.removeCell = deleteCell => {
       this.cellArray = this.cellArray.filter(cell => cell !== deleteCell)
-      //   console.log("deleting", deleteCell, " Cells left:", this.cellArray.length)
     }
 
     this.simulate = () => {
-      //use DeltaTime
       if (this.cellArray.length === 0) return
 
       this.cellArray.forEach(cell => {
         if (!cell instanceof Cell)
-          console.warn("cellArray contains not Cell Item .-.")
+          console.warn("cellArray contains not a Cell Item .-.")
         cell.simulate()
       })
     }
@@ -255,6 +267,10 @@ class CellManager {
     }
     this.pause = () => {
       this.paused = true
+    }
+
+    this.isMaxCellsReached = () => {
+      return this.cellArray.length >= this.maxCells
     }
   }
 }
@@ -266,11 +282,7 @@ export { cM_instance as CellManagerInstance }
 //helper
 function getRandomDirection(options) {
   if (!options || options.length === 0) throw new Error("")
-  const udlr = Math.random() * options.length
+  const rIndex = Math.floor(Math.random() * options.length)
 
-  for (let i = 0; i < options.length; i++) {
-    if (udlr < i + 1) {
-      return options[i]
-    }
-  }
+  return options[rIndex]
 }

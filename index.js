@@ -43,6 +43,7 @@ function drawText(text, x, y, fontSize, fontFamily, color) {
 
 class GridItem {
   constructor(height, width, x, y, row, col, color) {
+    this.id = `${row},${col}`
     this.height = height
     this.width = width
     this.x = x
@@ -99,6 +100,9 @@ class GridItem {
     }
   }
 }
+
+//next push will be removing array for this should it actually be faster its to try
+const gridIdIndex = new Map() // to improve access
 function createGrid(rows, columns, color) {
   const grid = []
 
@@ -114,7 +118,9 @@ function createGrid(rows, columns, color) {
     for (let col = 0; col < columns; col++) {
       const x = col * cellWidth
       const y = row * cellHeight
-      grid.push(new GridItem(cellHeight, cellWidth, x, y, row, col, color))
+      let newGI = new GridItem(cellHeight, cellWidth, x, y, row, col, color)
+      grid.push(newGI)
+      gridIdIndex.set(`${newGI.row},${newGI.col}`, newGI)
     }
   }
 
@@ -154,13 +160,12 @@ async function loadRandomImage(gridToDraw) {
 }
 
 function getGridItem(atRow, atCol) {
-  return gridArray.find(({ col, row }) => {
-    return col === atCol && row === atRow
-  })
+  const id = `${atRow},${atCol}`
+  return gridIdIndex.get(id) || null
 }
 
 //usage example:
-const gridArray = createGrid(50, 50, "lightgray")
+const gridArray = createGrid(100, 100, "lightgray")
 
 let fps = 0,
   shouldDrawFps = true,
@@ -180,7 +185,7 @@ const reset = () => {
 }
 
 const cellManager = CellManagerInstance
-const myCell = new Cell(5, 5, 100, true, getGridItem)
+const myCell = new Cell(50, 50, 100, true, getGridItem)
 cellManager.addCell(myCell)
 let pause = false
 
@@ -196,7 +201,8 @@ window.addEventListener("keydown", ev => {
 })
 
 let timeLastUpdate
-const maxDeltaTime = 1 / 165 // since i have 165
+
+const maxDeltaTime = 1 / 165 // simulationspeed/ targeted simulationrate
 
 const update = () => {
   const currentTime = performance.now()
