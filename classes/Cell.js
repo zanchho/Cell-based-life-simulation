@@ -130,7 +130,7 @@ export class Cell {
     }
 
     //random %to move randomly
-    if (Math.random() < 0.01) {
+    if (Math.random() < 0.1) {
       const direction = getRandomDirection([
         [1, 0],
         [0, 1],
@@ -141,6 +141,7 @@ export class Cell {
       return
     }
 
+    //maybe add a success chance
     if (
       !cM_instance.isMaxCellsReached() &&
       this.energy > 70 &&
@@ -152,12 +153,11 @@ export class Cell {
 
     //idle
     this.photosynthesise()
-
+    //TODO handle seeds within Manager to fix the hurting blinking
     this.growSeeds()
   }
 }
 
-//issue seeds aint getting simulated .-.
 class Seed {
   constructor(row, col, energy, origin) {
     this.row = row
@@ -172,7 +172,7 @@ class Seed {
     this.FnClearGridItem = () => {
       const gI = this.origin.FnGetGridItem(this.row, this.col)
       if (!gI) {
-        // console.warn("FnClearGridItem missing GI")
+        // reasons for missing GI is RowColOutOfIndex
         return
       }
       gI.contentType = undefined
@@ -231,6 +231,12 @@ each one more approachable
 */
 class CellManager {
   //first implementing of existing only one type across the simulation
+
+  //TODO test higher maxCells with seeds managed by this
+
+  //TODO after seeds are here implement multiGroup cells
+
+  //think about like interactions?
   constructor() {
     this.maxCells = 1500 //limiting for performance tho
     // initialCellArray[0] = {row, col, energy = 100, alive = true, FnGetGridItem}
