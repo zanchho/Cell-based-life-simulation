@@ -117,17 +117,14 @@ export class Cell {
 }
 
 class Seed {
-  constructor(row, col, energy, FnGetGridItem) {
+  constructor(row, col, energy) {
     this.row = row
     this.col = col
     this.energy = energy
     this.color = "yellow"
-    this.origin = origin
 
     this.growingState = 0
     this.grownAt = 5
-
-    this.FnGetGridItem = FnGetGridItem
 
     this.grow = () => {
       //random here establishes a low %rate where Cells just die
@@ -136,15 +133,7 @@ class Seed {
         this.energy -= 5 // Energy cost for growing
         if (this.growingState === this.grownAt) {
           FnClearGridItem(this.row, this.col)
-          cM_instance.addCell(
-            new Cell(
-              this.row,
-              this.col,
-              this.energy,
-              true,
-              this.origin.FnGetGridItem
-            )
-          )
+          cM_instance.addCell(new Cell(this.row, this.col, this.energy, true))
           this.killSeed()
           return
         }
@@ -178,14 +167,14 @@ class CellManager {
 
   //think about like interactions?
   constructor() {
-    this.maxCells = 14400 //limiting for performance tho
+    this.maxCells = 5000 //limiting for performance tho
     this.FnGetGridItem = function () {
       console.error("CellManager.FnGetGridItem is not set")
     }
 
     this.paused = false
-    this.cellArray = []
-    this.seeds = []
+    this.cellArray = new Map()
+    this.seeds = new Map()
     this.addCell = cell => {
       if (!(cell instanceof Cell)) return false
       if (this.isMaxCellsReached()) {
@@ -196,20 +185,21 @@ class CellManager {
         return false
       }
 
-      this.cellArray.push(cell)
+      this.cellArray.set(cell, cell)
       return true
     }
     this.removeCell = deleteCell => {
-      this.cellArray = this.cellArray.filter(cell => cell !== deleteCell)
+      this.cellArray.delete(deleteCell)
     }
 
     this.addSeed = (row, col, energy) => {
       //maybe seedMaxLimit if performance needs it
-      this.seeds.push(new Seed(row, col, energy, this.FnGetGridItem))
+      const nSeed = new Seed(row, col, energy, this.FnGetGridItem)
+      this.seeds.set(nSeed, nSeed)
     }
 
     this.removeSeed = seedToRemove => {
-      this.seeds = this.seeds.filter(seed => seed !== seedToRemove)
+      this.seeds.delete(seedToRemove)
     }
 
     this.updateSeeds = () => {
@@ -239,8 +229,9 @@ class CellManager {
     }
 
     this.isMaxCellsReached = () => {
-      return this.cellArray.length >= this.maxCells
+      return this.cellArray.size >= this.maxCells
     }
+    this.simulate()
   }
 }
 
@@ -254,7 +245,6 @@ function FnIsGridItemEmpty(row, col) {
   const FnGetGridItem = cM_instance.FnGetGridItem
   let gI = FnGetGridItem(row, col)
   if (!gI) {
-    console.log("FnIsGridItemEmpty early return")
     return false
   }
   if (!gI.hasOwnProperty("contentType") || gI.contentType === undefined) {
@@ -271,6 +261,7 @@ function FnClearGridItem(row, col) {
   gI.contentType = undefined
   gI.content = undefined
   gI.contentWaiting = false
+  gI.requiresDraw = true
 }
 function updateGridItemProperties(row, col, color) {
   const FnGetGridItem = cM_instance.FnGetGridItem
@@ -279,12 +270,33 @@ function updateGridItemProperties(row, col, color) {
   gI.contentType = "rect"
   gI.content = color
   gI.contentWaiting = false
+  gI.requiresDraw = true
 }
+const maxCachedRIP = 10000
+let randomIndicesPool = []
+let poolIndex = 0
 
+function refillRandomIndicesPool(maxValue) {
+  let newarray = []
+  for (let i = 0; i < maxCachedRIP; i++) {
+    newarray.push(Math.floor(Math.random() * maxValue))
+  }
+  randomIndicesPool = newarray
+  poolIndex = 0
+}
+/** If options exceed the length of 4 touch this again */
 function getRandomDirection(options) {
   if (!options || options.length === 0)
     throw new Error("No possible Directions set")
-  const rIndex = Math.floor(Math.random() * options.length)
 
+  // Recache the pool if it's empty
+  if (poolIndex >= randomIndicesPool.length) {
+    refillRandomIndicesPool(options.length)
+  }
+
+  const rIndex = randomIndicesPool[poolIndex++]
   return options[rIndex]
 }
+
+// intiial fill of cache
+refillRandomIndicesPool(4)

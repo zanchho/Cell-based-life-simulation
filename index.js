@@ -55,9 +55,10 @@ class GridItem {
     this.content
     this.contentType
     this.contentWaiting = false
+    this.requiresDraw = false
     this.draw = () => {
-      if (!this.contentType) return
-
+      if (!this.contentType || !this.requiresDraw) return
+      this.needsRedraw = false
       switch (this.contentType) {
         case "img":
           ctx.drawImage(this.content, this.x, this.y, this.width, this.height)
@@ -160,8 +161,8 @@ async function loadRandomImage(gridToDraw) {
 }
 
 //usage example:
-const maxRows = 180 / 2,
-  maxCols = 320 / 2
+const maxRows = 180,
+  maxCols = 320
 const gridArray = createGrid(maxCols, maxRows, "lightgray")
 
 let fps = 0,
@@ -190,6 +191,7 @@ cellManager.FnGetGridItem = (atRow, atCol) => {
 function createTempCell() {
   let myCell = new Cell(maxRows / 2, maxCols / 2, 100, true)
   cellManager.addCell(myCell)
+  cellManager.simulate()
 }
 createTempCell()
 let pause = false
@@ -216,7 +218,7 @@ const update = () => {
   timeLastUpdate = currentTime
 
   if (!pause && deltaTimeSecs > maxDeltaTime) {
-    cellManager.simulate(deltaTimeSecs)
+    cellManager.simulate()
   }
 
   drawAll()
@@ -225,9 +227,9 @@ const update = () => {
     const fps_cells_seeds =
       fps.toFixed(0).toString() +
       "_" +
-      cellManager.cellArray.length +
+      cellManager.cellArray.size +
       "_" +
-      cellManager.seeds.length
+      cellManager.seeds.size
     drawText(fps_cells_seeds, 10, 20, "100%", "Arial", "#FFF")
   }
 
