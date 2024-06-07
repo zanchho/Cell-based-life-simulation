@@ -103,7 +103,7 @@ class GridItem {
 
 //next push will be removing array for this should it actually be faster its to try
 const gridIdIndex = new Map() // to improve access
-function createGrid(rows, columns, color) {
+function createGrid(columns, rows, color) {
   const grid = []
 
   function calculateDimensions(columns) {
@@ -159,13 +159,10 @@ async function loadRandomImage(gridToDraw) {
   console.log(`waiting for ${img} to load`)
 }
 
-function getGridItem(atRow, atCol) {
-  const id = `${atRow},${atCol}`
-  return gridIdIndex.get(id) || null
-}
-
 //usage example:
-const gridArray = createGrid(100, 100, "lightgray")
+const maxRows = 180 / 2,
+  maxCols = 320 / 2
+const gridArray = createGrid(maxCols, maxRows, "lightgray")
 
 let fps = 0,
   shouldDrawFps = true,
@@ -185,8 +182,16 @@ const reset = () => {
 }
 
 const cellManager = CellManagerInstance
-const myCell = new Cell(50, 50, 100, true, getGridItem)
-cellManager.addCell(myCell)
+cellManager.FnGetGridItem = (atRow, atCol) => {
+  const id = `${atRow},${atCol}`
+  return gridIdIndex.get(id) || null
+}
+
+function createTempCell() {
+  let myCell = new Cell(maxRows / 2, maxCols / 2, 100, true)
+  cellManager.addCell(myCell)
+}
+createTempCell()
 let pause = false
 
 window.addEventListener("keydown", ev => {
@@ -202,7 +207,7 @@ window.addEventListener("keydown", ev => {
 
 let timeLastUpdate
 
-const maxDeltaTime = 1 / 165 // simulationspeed/ targeted simulationrate
+const maxDeltaTime = 1 / 145 // simulationspeed/ targeted simulationrate
 
 const update = () => {
   const currentTime = performance.now()
@@ -216,7 +221,16 @@ const update = () => {
 
   drawAll()
 
-  if (shouldDrawFps) drawText(fps.toFixed(0), 10, 20, "100%", "Arial", "#FFF")
+  if (shouldDrawFps) {
+    const fps_cells_seeds =
+      fps.toFixed(0).toString() +
+      "_" +
+      cellManager.cellArray.length +
+      "_" +
+      cellManager.seeds.length
+    drawText(fps_cells_seeds, 10, 20, "100%", "Arial", "#FFF")
+  }
+
   requestAnimationFrame(reset)
   requestAnimationFrame(update)
   requestAnimationFrame(handleFPS)

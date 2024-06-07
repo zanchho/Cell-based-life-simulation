@@ -1,50 +1,15 @@
-import { PerformanceChecker } from "../PerfChecker.js"
-const checkHere = new PerformanceChecker()
 export class Cell {
-  constructor(row, col, energy = 100, alive = true, FnGetGridItem) {
+  constructor(row, col, energy = 100, alive = true) {
     this.row = row
     this.col = col
     this.energy = energy
     this.alive = alive
     this.color = "green"
-    this.seeds = []
-    this.FnGetGridItem = FnGetGridItem
-    this.FnIsGridItemEmpty = (row, col) => {
-      let res = this.FnGetGridItem(row, col)
-      if (!res) {
-        console.log("FnIsGridItemEmpty early return")
-        return false
-      }
-      if (!res.hasOwnProperty("contentType") || res.contentType === undefined) {
-        return true
-      }
-      return false
-    }
-    this.FnClearGridItem = () => {
-      const gI = this.FnGetGridItem(this.row, this.col)
-      if (!gI) {
-        console.log("FnClearGridItem missing GI")
-        return
-      }
-      gI.contentType = undefined
-      gI.content = undefined
-      gI.contentWaiting = false
-    }
-    this.FnMakeDrawAble = () => {
-      const gI = this.FnGetGridItem(this.row, this.col)
-      if (!gI) return
-      gI.contentType = "rect"
-      gI.content = this.color
-      gI.contentWaiting = false
-    }
-    this.FnMakeDrawAble()
+    this.seeds = [] //keeping track of it increases complexity so i abandon it soon
   }
 
   canMove(direction) {
-    return this.FnIsGridItemEmpty(
-      this.row + direction[0],
-      this.col + direction[1]
-    )
+    return FnIsGridItemEmpty(this.row + direction[0], this.col + direction[1])
   }
   move(direction) {
     if (!this.canMove(direction)) {
@@ -53,14 +18,14 @@ export class Cell {
     }
 
     //if it can move to the location its gonna clear up the GridItem
-    this.FnClearGridItem()
+    FnClearGridItem(this.row, this.col)
 
     //setNew POS
     this.row += direction[0]
     this.col += direction[1]
 
     //and after moving itself to the direction it sets the content of gridItem
-    this.FnMakeDrawAble()
+    updateGridItemProperties(this.row, this.col, this.color)
 
     /*
 
@@ -79,10 +44,10 @@ export class Cell {
   //energy gain
   photosynthesise() {
     let energyGain = 10
-    if (this.FnIsGridItemEmpty(this.row, this.col + 1)) energyGain += 5
-    if (this.FnIsGridItemEmpty(this.row + 1, this.col)) energyGain += 5
-    if (this.FnIsGridItemEmpty(this.row - 1, this.col)) energyGain += 5
-    if (this.FnIsGridItemEmpty(this.row, this.col - 1)) energyGain += 5
+    if (FnIsGridItemEmpty(this.row, this.col + 1)) energyGain += 5
+    if (FnIsGridItemEmpty(this.row + 1, this.col)) energyGain += 5
+    if (FnIsGridItemEmpty(this.row - 1, this.col)) energyGain += 5
+    if (FnIsGridItemEmpty(this.row, this.col - 1)) energyGain += 5
 
     this.energy += energyGain
     if (this.energy > 100) this.energy = 100
@@ -98,25 +63,21 @@ export class Cell {
 
     //effort to put into seed might need adjustments
     const pos = [this.row + direction[0], this.col + direction[1]]
-    if (this.FnIsGridItemEmpty(pos[0], pos[1])) {
+    if (FnIsGridItemEmpty(pos[0], pos[1])) {
       const passEnergyToSeed = 50
-      this.seeds.push(new Seed(pos[0], pos[1], passEnergyToSeed, this))
+
+      cM_instance.addSeed(pos[0], pos[1], passEnergyToSeed)
       this.energy -= passEnergyToSeed
     }
   }
-  growSeeds() {
-    this.seeds.forEach(seed => {
-      seed.grow()
-    })
-  }
+
   simulate() {
     //cycle energycost
     this.energy -= 15
     //delete killed Cells without Seeds
-    if (!this.alive && this.seeds.length === 0) {
-      //
+    if (!this.alive) {
       cM_instance.removeCell(this)
-      this.FnClearGridItem()
+      FnClearGridItem(this.row, this.col)
       return
     }
 
@@ -124,8 +85,7 @@ export class Cell {
     if (this.energy <= 0) {
       this.alive = false
       this.color = "red"
-      this.FnMakeDrawAble()
-      this.growSeeds()
+      updateGridItemProperties(this.row, this.col, this.color)
       return
     }
 
@@ -145,7 +105,7 @@ export class Cell {
     if (
       !cM_instance.isMaxCellsReached() &&
       this.energy > 70 &&
-      this.seeds.length < 1
+      Math.random() < 0.2
     ) {
       this.reproduce()
       return
@@ -153,13 +113,11 @@ export class Cell {
 
     //idle
     this.photosynthesise()
-    //TODO handle seeds within Manager to fix the hurting blinking
-    this.growSeeds()
   }
 }
 
 class Seed {
-  constructor(row, col, energy, origin) {
+  constructor(row, col, energy, FnGetGridItem) {
     this.row = row
     this.col = col
     this.energy = energy
@@ -169,32 +127,15 @@ class Seed {
     this.growingState = 0
     this.grownAt = 5
 
-    this.FnClearGridItem = () => {
-      const gI = this.origin.FnGetGridItem(this.row, this.col)
-      if (!gI) {
-        // reasons for missing GI is RowColOutOfIndex
-        return
-      }
-      gI.contentType = undefined
-      gI.content = undefined
-      gI.contentWaiting = false
-    }
-    this.FnMakeDrawAble = () => {
-      const gI = this.origin.FnGetGridItem(this.row, this.col)
-      if (!gI) return
-      gI.contentType = "rect"
-      gI.content = this.color
-      gI.contentWaiting = false
-    }
-    this.FnMakeDrawAble()
+    this.FnGetGridItem = FnGetGridItem
 
     this.grow = () => {
       //random here establishes a low %rate where Cells just die
-      //this.FnClearGridItem()
+
       if (this.energy > 0 && Math.random() > 0.01) {
         this.energy -= 5 // Energy cost for growing
         if (this.growingState === this.grownAt) {
-          this.FnClearGridItem()
+          FnClearGridItem(this.row, this.col)
           cM_instance.addCell(
             new Cell(
               this.row,
@@ -204,20 +145,19 @@ class Seed {
               this.origin.FnGetGridItem
             )
           )
-
+          this.killSeed()
           return
         }
-        this.FnMakeDrawAble()
+        updateGridItemProperties(this.row, this.col, this.color)
         this.growingState++
       } else {
         // console.log("seed dyes")
-        this.FnClearGridItem()
+        FnClearGridItem(this.row, this.col)
         this.killSeed()
       }
     }
     this.killSeed = () => {
-      this.origin.seeds = this.origin.seeds.filter(seed => seed !== this)
-      delete this
+      cM_instance.removeSeed(this)
     }
   }
 }
@@ -238,16 +178,21 @@ class CellManager {
 
   //think about like interactions?
   constructor() {
-    this.maxCells = 1500 //limiting for performance tho
-    // initialCellArray[0] = {row, col, energy = 100, alive = true, FnGetGridItem}
+    this.maxCells = 14400 //limiting for performance tho
+    this.FnGetGridItem = function () {
+      console.error("CellManager.FnGetGridItem is not set")
+    }
+
     this.paused = false
     this.cellArray = []
-
+    this.seeds = []
     this.addCell = cell => {
-      if (!cell instanceof Cell) return false
+      if (!(cell instanceof Cell)) return false
       if (this.isMaxCellsReached()) {
-        //kill cell
+        //this should be fine just not getting added bc GC
+        cell.alive = false
         cell.energy = -100
+        FnClearGridItem(cell.row, cell.col)
         return false
       }
 
@@ -258,9 +203,27 @@ class CellManager {
       this.cellArray = this.cellArray.filter(cell => cell !== deleteCell)
     }
 
+    this.addSeed = (row, col, energy) => {
+      //maybe seedMaxLimit if performance needs it
+      this.seeds.push(new Seed(row, col, energy, this.FnGetGridItem))
+    }
+
+    this.removeSeed = seedToRemove => {
+      this.seeds = this.seeds.filter(seed => seed !== seedToRemove)
+    }
+
+    this.updateSeeds = () => {
+      this.seeds.forEach(seed => {
+        seed.grow()
+      })
+    }
+
     this.simulate = () => {
       if (this.cellArray.length === 0) return
 
+      this.seeds.forEach(seed => {
+        seed.grow()
+      })
       this.cellArray.forEach(cell => {
         if (!cell instanceof Cell)
           console.warn("cellArray contains not a Cell Item .-.")
@@ -281,13 +244,46 @@ class CellManager {
   }
 }
 
+//singleton
 const cM_instance = new CellManager()
 
 export { cM_instance as CellManagerInstance }
 
 //helper
+function FnIsGridItemEmpty(row, col) {
+  const FnGetGridItem = cM_instance.FnGetGridItem
+  let gI = FnGetGridItem(row, col)
+  if (!gI) {
+    console.log("FnIsGridItemEmpty early return")
+    return false
+  }
+  if (!gI.hasOwnProperty("contentType") || gI.contentType === undefined) {
+    return true
+  }
+  return false
+}
+
+function FnClearGridItem(row, col) {
+  const FnGetGridItem = cM_instance.FnGetGridItem
+  const gI = FnGetGridItem(row, col)
+  if (!gI) return
+
+  gI.contentType = undefined
+  gI.content = undefined
+  gI.contentWaiting = false
+}
+function updateGridItemProperties(row, col, color) {
+  const FnGetGridItem = cM_instance.FnGetGridItem
+  const gI = FnGetGridItem(row, col)
+  if (!gI) return
+  gI.contentType = "rect"
+  gI.content = color
+  gI.contentWaiting = false
+}
+
 function getRandomDirection(options) {
-  if (!options || options.length === 0) throw new Error("")
+  if (!options || options.length === 0)
+    throw new Error("No possible Directions set")
   const rIndex = Math.floor(Math.random() * options.length)
 
   return options[rIndex]
