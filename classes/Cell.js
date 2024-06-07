@@ -184,22 +184,20 @@ class CellManager {
         FnClearGridItem(cell.row, cell.col)
         return false
       }
-
-      this.cellArray.set(cell, cell)
+      this.cellArray.set(cell.row + "-" + cell.col, cell)
       return true
     }
     this.removeCell = deleteCell => {
-      this.cellArray.delete(deleteCell)
+      this.cellArray.delete(deleteCell.row + "-" + deleteCell.col)
     }
 
     this.addSeed = (row, col, energy) => {
-      //maybe seedMaxLimit if performance needs it
+      if (this.cellArray.size + this.seeds.size > this.maxCells) return false
       const nSeed = new Seed(row, col, energy, this.FnGetGridItem)
-      this.seeds.set(nSeed, nSeed)
+      this.seeds.set(nSeed.row + "-" + nSeed.col, nSeed)
     }
-
     this.removeSeed = seedToRemove => {
-      this.seeds.delete(seedToRemove)
+      this.seeds.delete(seedToRemove.row + "-" + seedToRemove.col)
     }
 
     this.updateSeeds = () => {
