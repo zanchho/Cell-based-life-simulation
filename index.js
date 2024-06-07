@@ -5,7 +5,7 @@ const canvas = document.getElementById("canvas")
 /** @type {CanvasRenderingContext2D} */
 const ctx = canvas.getContext("2d")
 const gridHasLines = false
-
+let stopRender = false
 // Set canvas dimensions to match the window size
 function setCanvastoParentSize() {
   canvas.width = canvas.getBoundingClientRect().width
@@ -57,6 +57,7 @@ class GridItem {
     this.contentWaiting = false
     this.requiresDraw = false
     this.draw = () => {
+      if (stopRender) return
       if (!this.contentType || !this.requiresDraw) return
       this.needsRedraw = false
       switch (this.contentType) {
@@ -189,8 +190,7 @@ cellManager.FnGetGridItem = (atRow, atCol) => {
 }
 
 function createTempCell() {
-  let myCell = new Cell(maxRows / 2, maxCols / 2, 100, true)
-  cellManager.addCell(myCell)
+  cellManager.addCellObj(new Cell(maxRows / 2, maxCols / 2))
   cellManager.simulate()
 }
 createTempCell()
@@ -204,6 +204,14 @@ window.addEventListener("keydown", ev => {
       else cellManager.start()
     }
     togglePause()
+    return
+  }
+  if (ev.key === "r") {
+    //stop rendering for a second
+    stopRender = true
+    setTimeout(() => {
+      stopRender = false
+    }, 1000)
   }
 })
 

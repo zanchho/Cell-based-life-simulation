@@ -1,11 +1,14 @@
 export class Cell {
-  constructor(row, col, energy = 100, alive = true) {
+  constructor(row, col, energy = -1, alive = true) {
     this.row = row
     this.col = col
     this.energy = energy
     this.alive = alive
     this.color = "green"
     this.seeds = [] //keeping track of it increases complexity so i abandon it soon
+
+    this.stats = { maxEnergy: 120 }
+    if (this.energy === -1) this.energy = this.stats.maxEnergy
   }
 
   canMove(direction) {
@@ -44,13 +47,13 @@ export class Cell {
   //energy gain
   photosynthesise() {
     let energyGain = 10
-    if (FnIsGridItemEmpty(this.row, this.col + 1)) energyGain += 5
-    if (FnIsGridItemEmpty(this.row + 1, this.col)) energyGain += 5
-    if (FnIsGridItemEmpty(this.row - 1, this.col)) energyGain += 5
-    if (FnIsGridItemEmpty(this.row, this.col - 1)) energyGain += 5
+    if (FnIsGridItemEmpty(this.row, this.col + 1)) energyGain += 10
+    if (FnIsGridItemEmpty(this.row + 1, this.col)) energyGain += 10
+    if (FnIsGridItemEmpty(this.row - 1, this.col)) energyGain += 10
+    if (FnIsGridItemEmpty(this.row, this.col - 1)) energyGain += 10
 
     this.energy += energyGain
-    if (this.energy > 100) this.energy = 100
+    if (this.energy > this.stats.maxEnergy) this.energy = this.stats.maxEnergy
   }
 
   reproduce() {
@@ -72,47 +75,43 @@ export class Cell {
   }
 
   simulate() {
-    //cycle energycost
+    // Cycle energy cost
     this.energy -= 15
-    //delete killed Cells without Seeds
-    if (!this.alive) {
-      cM_instance.removeCell(this)
-      FnClearGridItem(this.row, this.col)
-      return
-    }
 
-    //kill on missing energy
+    // Check for death conditions first for early exit
     if (this.energy <= 0) {
       this.alive = false
-      this.color = "red"
-      updateGridItemProperties(this.row, this.col, this.color)
+      if (!FnIsGridItemEmpty(this.row, this.col))
+        FnClearGridItem(this.row, this.col)
       return
     }
 
-    //random %to move randomly
+    // Random movement
     if (Math.random() < 0.1) {
-      const direction = getRandomDirection([
-        [1, 0],
-        [0, 1],
-        [0, -1],
-        [-1, 0],
-      ])
-      this.move(direction)
+      this.moveRandomly()
       return
     }
 
-    //maybe add a success chance
-    if (
-      !cM_instance.isMaxCellsReached() &&
-      this.energy > 70 &&
-      Math.random() < 0.2
-    ) {
+    // Reproduction condition check
+    const isMaxCellsReached = cM_instance.isMaxCellsReached()
+    const energyThresholdMet = this.energy > 70
+    if (!isMaxCellsReached && energyThresholdMet && Math.random() < 0.2) {
       this.reproduce()
       return
     }
 
-    //idle
+    // Idle action
     this.photosynthesise()
+  }
+
+  moveRandomly() {
+    const direction = getRandomDirection([
+      [1, 0],
+      [0, 1],
+      [0, -1],
+      [-1, 0],
+    ])
+    this.move(direction)
   }
 }
 
@@ -128,25 +127,24 @@ class Seed {
 
     this.grow = () => {
       //random here establishes a low %rate where Cells just die
-
-      if (this.energy > 0 && Math.random() > 0.01) {
-        this.energy -= 5 // Energy cost for growing
-        if (this.growingState === this.grownAt) {
-          FnClearGridItem(this.row, this.col)
-          cM_instance.addCell(new Cell(this.row, this.col, this.energy, true))
-          this.killSeed()
-          return
-        }
-        updateGridItemProperties(this.row, this.col, this.color)
-        this.growingState++
-      } else {
-        // console.log("seed dyes")
-        FnClearGridItem(this.row, this.col)
+      if (!(this.energy > 0 && Math.random() > 0.01)) {
         this.killSeed()
+        return
       }
+
+      this.energy -= 5 // Energy cost for growing
+      if (this.growingState === this.grownAt) {
+        this.killSeed()
+        cM_instance.addCell(this.row, this.col, this.energy)
+
+        return
+      }
+      updateGridItemProperties(this.row, this.col, this.color)
+      this.growingState++
     }
     this.killSeed = () => {
-      cM_instance.removeSeed(this)
+      cM_instance.removeSeed(this.row, this.col)
+      FnClearGridItem(this.row, this.col)
     }
   }
 }
@@ -171,24 +169,24 @@ class CellManager {
     this.FnGetGridItem = function () {
       console.error("CellManager.FnGetGridItem is not set")
     }
-
     this.paused = false
     this.cellArray = new Map()
     this.seeds = new Map()
-    this.addCell = cell => {
-      if (!(cell instanceof Cell)) return false
+    //maybe head over values instead Obj
+    this.addCell = (row, col, energy = 100) => {
       if (this.isMaxCellsReached()) {
-        //this should be fine just not getting added bc GC
-        cell.alive = false
-        cell.energy = -100
-        FnClearGridItem(cell.row, cell.col)
-        return false
+        FnClearGridItem(row, col)
+        return
+        //TODO maybe add a warning that max cells is reached
       }
+      const cell = new Cell(row, col, energy)
       this.cellArray.set(cell.row + "-" + cell.col, cell)
       return true
     }
-    this.removeCell = deleteCell => {
-      this.cellArray.delete(deleteCell.row + "-" + deleteCell.col)
+    this.addCellObj = cell => {
+      if (!(cell instanceof Cell)) return false
+      this.cellArray.set(cell.row + "-" + cell.col, cell)
+      return true
     }
 
     this.addSeed = (row, col, energy) => {
@@ -196,8 +194,8 @@ class CellManager {
       const nSeed = new Seed(row, col, energy, this.FnGetGridItem)
       this.seeds.set(nSeed.row + "-" + nSeed.col, nSeed)
     }
-    this.removeSeed = seedToRemove => {
-      this.seeds.delete(seedToRemove.row + "-" + seedToRemove.col)
+    this.removeSeed = (row, col) => {
+      this.seeds.delete(row + "-" + col)
     }
 
     this.updateSeeds = () => {
@@ -205,18 +203,21 @@ class CellManager {
         seed.grow()
       })
     }
-
-    this.simulate = () => {
-      if (this.cellArray.length === 0) return
-
-      this.seeds.forEach(seed => {
-        seed.grow()
-      })
+    this.updateCells = () => {
       this.cellArray.forEach(cell => {
-        if (!cell instanceof Cell)
-          console.warn("cellArray contains not a Cell Item .-.")
         cell.simulate()
       })
+    }
+
+    this.cleanUpDeadCells = () => {
+      this.cellArray = new Map(
+        [...this.cellArray].filter(([_, cell]) => cell.alive)
+      )
+    }
+    this.simulate = () => {
+      this.updateSeeds()
+      this.updateCells()
+      this.cleanUpDeadCells() // To avoid deleting live map
     }
 
     this.start = () => {
